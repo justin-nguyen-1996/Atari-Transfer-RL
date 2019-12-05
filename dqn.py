@@ -2,27 +2,47 @@
 #===================
 # Imports
 #===================
-import matplotlib
-matplotlib.use('Agg')
 
 import numpy as np
 import gym
-import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocatorimport
 import torch
 import warnings # For ignoring pytorch warnings
 import time
 import datetime
+import collections
 
-import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocatorimport collections
+#===================
+# Config Stuff
+#===================
 
+log_dir = "logs/"
+
+# Reference - https://github.com/openai/baselines/blob/master/baselines/common/atari_wrappers.py
+env_id = "PongNoFrameskip-v4"
+env = make_atari(env_id)
+env = wrap_deepmind(env, episode_life=True, clip_rewards=True, frame_stack=False, scale=True)
+
+# TODO DQN
+model = DQN()
+
+total_reward = 0
+epsilon = 0.1
+total_steps = 500000
+state = env.reset()
+experience_replay_size = 10000
+alpha = 3e-4
+gamma = 0.99
+batch_size = 16
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+target_network_update_freq = 500
 
 #=====================
 # Network Declaration
 #=====================
 
 class DQN_Network(nn.Module):
-    # TODO: change state_dims or pass in as correct size after state aggregation
     def __init__(self, state_dims, num_actions):
         # Initialize parent's constructor
         super(DQN, self).__init__()
@@ -58,70 +78,89 @@ class DQN_Network(nn.Module):
 
 class DQN():
     def __init__(self):
-        self.experience_replay = # TODO
+        self.experience_replay = collections.deque(maxlen=experience_replay_size)
         self.network = DQN_Network()
         self.target_network = DQN_Network()
+        self.optimizer = torch.optim.Adam(self.network.parameters(), lr=alpha)
         self.rewards = []
-        pass
 
     # Return the Q-value of (s,a)
     def __call__(self, s, a):
-        pass
-    
+        with torch.no_grad():
+            return self.network(s)[a]
+
     # Return Greedy Action
     def get_action(self, s, epsilon):
-        pass
-    
+        if (np.random(0, 1) < epsilon):
+            return np.randint(0, env.action_space.n)
+        else:
+            with torch.no_grad():
+                q_values = self.network(s)
+                return np.argmax(q_values)
+
     # Keep Track of Rewards
     def save_reward(self, r):
         self.rewards.append(r)
 
     # Save Network
     def save_network(self):
-        pass
+        torch.save(self.network.state_dict(), 'logs/saved_network.pt')
+        torch.save(self.optimizer.state_dict(), 'logs/saved_network_optimizer.pt')
+
+    def get_loss(self):
+        # Grab random trajectories from experience replay
+        trajectories = np.random.sample(self.experience_replay, batch_size)
+        # Unpack trajectories
+        states, actions, rewards, next_states = zip(*trajectories)
+        # Reshape and create tensors
+        states = torch.tensor(states, device=device, dtype=torch.float).view(batch_size, self.state_dims)
+        actions = torch.tensor(actions, device=device, dtype=torch.long).squeeze().view(-1, 1)
+        rewards = torch.tensor(rewards, device=device, dtype=torch.float).squeeze().view(-1, 1)
+        next_states = torch.tensor(next_states, device=device, dtype=torch.float).view(batch_size, self.state_dims)
+        # Compute the TD error
+        with torch.no_grad():
+            q_values = self.network(states).gather(1, actions)
+            target_action = self.target_model(next_states).argmax()
+            target_q_values = self.target_model(next_states).gather(1, target_action)
+        td_error = rewards + gamma*target_q_values - q_values
+        loss = (0.5 * td_error**2).mean()
+        return loss
 
     # Update Model Based on state
-    def update(self, state)
-    # TODO: change reward function
-    # TODO: use environment wrappers to clip rewards, skip frames, stack frames
-    #       - https://github.com/openai/baselines/blob/master/baselines/common/atari_wrappers.py
- 
+    def update(self, s, a, r, sp):
+        # Save experience
+        self.experience_replay.append((s, a, r, sp))
+        # Get loss
+        loss = self.get_loss()
+        # Backprop and update the weights
+        self.optimizer.zero_grad()
+        loss.backward()
+        for param in self.network.parameters():
+            param.grad.data.clamp_(-1, 1)
+        self.optimizer.step()
+        # Update the target network every so often
+        self.target_network_update_count += 1
+        if self.target_network_update_count % target_network_update_freq == 0:
+            self.target_network.load_state_dict(self.network.state_dict())
+
 #==================
 # Training Loop
 #==================
 
-#%% md
-
- ## Training Loop
-
-#%%
-
 # Run Time
 start=timer()
 
-log_dir = "log/"
-
-env_id = "PongNoFrameskip-v4"
-env    = make_atari(env_id)
-env    = wrap_deepmind(env, episode_life=True, clip_rewards=True, frame_stack=False, scale=True)
-
-# TODO DQN
-model = DQN()
-
-total_reward = 0
-epsilon = 0.1
-total_steps = 500000
-state = env.reset()
 for i_steps in range(1, total_steps):
     action = model.get_action(observation, epsilon)
-    
+
     prev_state = state
     state, reward, done, _ = env.step(action)
+    # TODO: change state_dims or pass in as correct size after state aggregation
     state = None if done else observation
 
     model.update(state)
-    
-    #Reward for Surviving (Therefore just 1 per time step)
+
+    # Reward for Surviving (Therefore just 1 per time step)
     total_reward += 1
 
     if done:
