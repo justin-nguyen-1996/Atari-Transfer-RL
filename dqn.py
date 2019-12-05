@@ -8,12 +8,15 @@ import gym
 import matplotlib
 import torch
 import warnings # For ignoring pytorch warnings
+import time
+import datetime
+import collections
 
 #=====================
 # Network Declaration
 #=====================
 
-class DQN(nn.Module):
+class DQN_Network(nn.Module):
     # TODO: change state_dims or pass in as correct size after state aggregation
     def __init__(self, state_dims, num_actions):
         # Initialize parent's constructor
@@ -43,4 +46,27 @@ class DQN(nn.Module):
         conv_output = self.conv3(self.conv2(self.conv1(state_dim_zeros)))
         feature_size = conv_output.view(1, -1).size(1)
         return feature_size
+
+    # TODO: update weights of DQN network
+    def update(self):
+        pass
+
+#===================
+# DQN Algorithm
+#===================
+
+class DQN():
+    def __init__(self):
+        self.experience_replay = # TODO
+        self.network = DQN_Network()
+        self.target_network = DQN_Network()
+        pass
+
+    # Return the Q-value of (s,a)
+    def __call__(self, s, a):
+        pass
+
+    # TODO: change reward function
+    # TODO: use environment wrappers to clip rewards, skip frames, stack frames
+    #       - https://github.com/openai/baselines/blob/master/baselines/common/atari_wrappers.py
 
