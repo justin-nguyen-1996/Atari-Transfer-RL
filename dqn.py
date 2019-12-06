@@ -2,6 +2,9 @@
 #===================
 # Imports
 #===================
+import matplotlib
+matplotlib.use('Agg')
+
 
 import numpy as np
 import gym
@@ -35,17 +38,19 @@ env.observation_space = gym.spaces.box.Box(
     dtype=env.observation_space.dtype)
 
 total_reward = 0
-epsilon = 0.1
+epsilon = 0.01
 #total_steps = 500000
-total_steps = 100000
+total_steps = 1000000
 state = env.reset()
 experience_replay_size = 10000
 alpha = 3e-4
-gamma = 0.99
+gamma = 0.9
 batch_size = 16
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 target_network_update_freq = 500
+scale = 4 # Bigger is Smaller
 
+dmap = [2,5]
 #=====================
 # Network Declaration
 #=====================
@@ -55,15 +60,19 @@ class DQN_Network(nn.Module):
         # Initialize parent's constructor
         super(DQN_Network, self).__init__()
         # Initialize object variables
-        self.state_dims = state_dims
+        self.state_dims = list(state_dims)
+        self.state_dims[1] = int(self.state_dims[1]/scale)
+        self.state_dims[2] = int(self.state_dims[2]/scale)
+        self.state_dims = tuple(self.state_dims)
         self.num_actions = num_actions
+        print(self.state_dims)
         # Convolution layers
-        self.conv1 = nn.Conv2d(self.state_dims[0], 32, kernel_size=8, stride=4)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
-        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
+        self.conv1 = nn.Conv2d(self.state_dims[0], 16, kernel_size=4, stride=4)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=2, stride=2)
+        self.conv3 = nn.Conv2d(32, 32, kernel_size=1, stride=1)
         # Fully connected layers
-        self.fc1 = nn.Linear(self.feature_size(), 512)
-        self.fc2 = nn.Linear(512, self.num_actions)
+        self.fc1 = nn.Linear(self.feature_size(), 128)
+        self.fc2 = nn.Linear(128, self.num_actions)
 
     def forward(self, x):
         x = torch.nn.functional.relu(self.conv1(x))
@@ -88,12 +97,15 @@ class DQN():
     def __init__(self):
         self.experience_replay = collections.deque(maxlen=experience_replay_size)
         self.state_dims = env.observation_space.shape
-        self.num_actions = env.action_space.n
+        self.num_actions = 2#env.action_space.n
         self.network = DQN_Network(self.state_dims, self.num_actions)
         self.target_network = DQN_Network(self.state_dims, self.num_actions)
+        self.state_dims = self.network.state_dims
         self.optimizer = torch.optim.Adam(self.network.parameters(), lr=alpha)
         self.rewards = []
         self.target_network_update_count = 0
+        self.network = self.network.to(device)
+        self.target_network = self.target_network.to(device)
 
     # Return the Q-value of (s,a)
     def __call__(self, s, a):
@@ -103,12 +115,13 @@ class DQN():
     # Return Greedy Action
     def get_action(self, s, epsilon):
         if (np.random.uniform(0, 1) < epsilon):
-            return np.random.randint(0, env.action_space.n)
+            return np.random.randint(0, 2)#env.action_space.n)
         else:
             with torch.no_grad():
                 s = torch.tensor([s], device=device, dtype=torch.float)
                 q_values = self.network(s)
-                return np.argmax(q_values)
+                a = q_values.argmax()
+                return a
 
     # Keep Track of Rewards
     def save_reward(self, r):
@@ -157,34 +170,46 @@ class DQN():
 # Training Loop
 #==================
 
+def state_abstraction(state):
+    state = state.transpose(2, 0, 1)
+    ns = state.reshape(state.shape[1],state.shape[2]) 
+    ns = ns.reshape((ns.shape[0]//scale,scale,ns.shape[1]//scale,scale)).mean(axis=3).mean(1)
+    ns = ns.reshape(1,ns.shape[0],ns.shape[1])
+    return ns
 # Run Time
 start =time.time()
+total_episodes = 0
 model = DQN()
 state = env.reset()
-state = state.transpose(2, 0, 1)
+state = state_abstraction(state)
+print(state.shape)
 for i_steps in range(1, total_steps):
     action = model.get_action(state, epsilon)
 
     prev_state = state
-    state, reward, done, _ = env.step(action)
-    state = state.transpose(2, 0, 1)
+    state, reward, done, _ = env.step(dmap[action])
+    state = state_abstraction(state)
     # TODO: change state_dims or pass in as correct size after state aggregation
 #    if done:
 #        state = None
-
+    #reward = 1
+    #if done:
+        #reward = -1000000
+    
     # Save experience
-    model.experience_replay.append((prev_state, action, reward, state))
+    model.experience_replay.append((prev_state, action, reward, state))    
 
     # Skip some frames to get some experiences in replay buffer
     if i_steps >= 100:
         model.update(prev_state, action, reward, state)
 
     # Reward for Surviving (Therefore just 1 per time step)
-    total_reward += 1
+    total_reward += reward
 
     if done:
+        #total_reward += 1000000
         state = env.reset()
-        state = state.transpose(2, 0, 1)
+        state = state_abstraction(state)
         model.save_reward(total_reward)
         print(f'total_reward: {total_reward}')
         total_reward = 0
@@ -197,8 +222,9 @@ for i_steps in range(1, total_steps):
         plt.savefig('plot.png')
         plt.clf()
         plt.close()
+        total_episodes +=1
 
-    if i_steps % 1000 == 0:
+    if i_steps % 100 == 0:
         time_delta = int(time.time() - start)
         time_delta = datetime.timedelta(seconds=time_delta)
         print(f'i_steps: {i_steps}, time: {time_delta}')
