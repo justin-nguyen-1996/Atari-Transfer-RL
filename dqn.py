@@ -6,12 +6,16 @@
 import numpy as np
 import gym
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocatorimport
+from matplotlib.ticker import MaxNLocator
 import torch
+import torch.nn as nn
 import warnings # For ignoring pytorch warnings
 import time
 import datetime
 import collections
+
+from baselines import bench
+from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 
 #===================
 # Config Stuff
@@ -25,8 +29,6 @@ env = make_atari(env_id)
 env = wrap_deepmind(env, episode_life=True, clip_rewards=True, frame_stack=False, scale=True)
 
 # TODO DQN
-model = DQN()
-
 total_reward = 0
 epsilon = 0.1
 total_steps = 500000
@@ -45,12 +47,12 @@ target_network_update_freq = 500
 class DQN_Network(nn.Module):
     def __init__(self, state_dims, num_actions):
         # Initialize parent's constructor
-        super(DQN, self).__init__()
+        super(DQN_Network, self).__init__()
         # Initialize object variables
         self.state_dims = state_dims
         self.num_actions = num_actions
         # Convolution layers
-        self.conv1 = nn.Conv2d(self.state_dims, 32, kernel_size=8, stride=4)
+        self.conv1 = nn.Conv2d(self.state_dims[0], 32, kernel_size=8, stride=4)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
         self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
         # Fully connected layers
@@ -67,7 +69,7 @@ class DQN_Network(nn.Module):
         return x
 
     def feature_size(self):
-        state_dim_zeros = torch.zeros(1, self.state_dims)
+        state_dim_zeros = torch.zeros(1, *self.state_dims)
         conv_output = self.conv3(self.conv2(self.conv1(state_dim_zeros)))
         feature_size = conv_output.view(1, -1).size(1)
         return feature_size
@@ -79,8 +81,10 @@ class DQN_Network(nn.Module):
 class DQN():
     def __init__(self):
         self.experience_replay = collections.deque(maxlen=experience_replay_size)
-        self.network = DQN_Network()
-        self.target_network = DQN_Network()
+        self.num_feats = env.observation_space.shape
+        self.num_actions = env.action_space.n
+        self.network = DQN_Network(self.num_feats,self.num_actions)
+        self.target_network = DQN_Network(self.num_feats,self.num_actions)
         self.optimizer = torch.optim.Adam(self.network.parameters(), lr=alpha)
         self.rewards = []
 
@@ -148,8 +152,8 @@ class DQN():
 #==================
 
 # Run Time
-start=timer()
-
+#start=timer()
+model = DQN()
 for i_steps in range(1, total_steps):
     action = model.get_action(observation, epsilon)
 
