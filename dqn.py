@@ -35,13 +35,15 @@ env.observation_space = gym.spaces.box.Box(
     dtype=env.observation_space.dtype)
 
 total_reward = 0
-epsilon = 0.1
+#epsilon = 0.1
+epsilon = 0.02
 #total_steps = 500000
 total_steps = 100000
 state = env.reset()
 experience_replay_size = 10000
 alpha = 3e-4
-gamma = 0.99
+#gamma = 0.99
+gamma = 0.9
 batch_size = 16
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 target_network_update_freq = 500
@@ -94,6 +96,9 @@ class DQN():
         self.optimizer = torch.optim.Adam(self.network.parameters(), lr=alpha)
         self.rewards = []
         self.target_network_update_count = 0
+        # Move stuff to the correct device (cuda gpu or cpu)
+        self.network = self.network.to(device)
+        self.target_network = self.target_network.to(device)
 
     # Return the Q-value of (s,a)
     def __call__(self, s, a):
@@ -101,14 +106,15 @@ class DQN():
             return self.network(s)[a]
 
     # Return Greedy Action
-    def get_action(self, s, epsilon):
+    def get_epsilon_greedy_action(self, s, epsilon):
         if (np.random.uniform(0, 1) < epsilon):
             return np.random.randint(0, env.action_space.n)
         else:
             with torch.no_grad():
                 s = torch.tensor([s], device=device, dtype=torch.float)
                 q_values = self.network(s)
-                return np.argmax(q_values)
+                a = q_values.argmax()
+                return a
 
     # Keep Track of Rewards
     def save_reward(self, r):
@@ -162,7 +168,7 @@ model = DQN()
 state = env.reset()
 state = state.transpose(2, 0, 1)
 for i_steps in range(1, total_steps):
-    action = model.get_action(state, epsilon)
+    action = model.get_epsilon_greedy_action(state, epsilon)
 
     prev_state = state
     state, reward, done, _ = env.step(action)
