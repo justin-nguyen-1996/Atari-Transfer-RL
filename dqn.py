@@ -25,8 +25,8 @@ from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 log_dir = "logs/"
 
 # Reference - https://github.com/openai/baselines/blob/master/baselines/common/atari_wrappers.py
-env_id = "PongNoFrameskip-v4"
-env = make_atari(env_id)
+env_name = "PongNoFrameskip-v4"
+env = make_atari(env_name)
 env = wrap_deepmind(env, episode_life=True, clip_rewards=True, frame_stack=False, scale=True)
 env.observation_space = gym.spaces.box.Box(
     env.observation_space.low[0, 0, 0],
@@ -116,8 +116,8 @@ class DQN():
 
     # Save Network
     def save_network(self):
-        torch.save(self.network.state_dict(), 'logs/saved_network.pt')
-        torch.save(self.optimizer.state_dict(), 'logs/saved_network_optimizer.pt')
+        torch.save(self.network.state_dict(), 'logs/{}_saved_network.pt'.format(env_name))
+        torch.save(self.optimizer.state_dict(), 'logs/{}_saved_network_optimizer.pt'.format(env_name))
 
     def get_loss(self):
         # Grab random trajectories from experience replay
@@ -157,8 +157,7 @@ class DQN():
 # Training Loop
 #==================
 
-# Run Time
-start =time.time()
+start = time.time()
 model = DQN()
 state = env.reset()
 state = state.transpose(2, 0, 1)
@@ -180,7 +179,8 @@ for i_steps in range(1, total_steps):
         model.update(prev_state, action, reward, state)
 
     # Reward for Surviving (Therefore just 1 per time step)
-    total_reward += 1
+#    total_reward += 1 # TODO: change reward function
+    total_reward += reward
 
     if done:
         state = env.reset()
