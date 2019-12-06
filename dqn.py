@@ -157,7 +157,7 @@ class DQN():
 #==================
 
 # Run Time
-#start=timer()
+start =time.time()
 model = DQN()
 state = env.reset()
 state = state.transpose(2, 0, 1)
@@ -168,8 +168,8 @@ for i_steps in range(1, total_steps):
     state, reward, done, _ = env.step(action)
     state = state.transpose(2, 0, 1)
     # TODO: change state_dims or pass in as correct size after state aggregation
-    if done:
-        state = None
+#    if done:
+#        state = None
 
     # Save experience
     model.experience_replay.append((prev_state, action, reward, state))
@@ -183,11 +183,15 @@ for i_steps in range(1, total_steps):
 
     if done:
         state = env.reset()
+        state = state.transpose(2, 0, 1)
         model.save_reward(total_reward)
+        print(f'total_reward: {total_reward}')
         total_reward = 0
 
-    if i_steps % 1000 == 0:
-        print(f'i_steps: {i_steps}')
+    if i_steps % 100 == 0:
+        time_delta = int(time.time() - start)
+        time_delta = datetime.timedelta(seconds=time_delta)
+        print(f'i_steps: {i_steps}, time: {time_delta}')
 
     if i_steps % 10000 == 0:
         model.save_network()
