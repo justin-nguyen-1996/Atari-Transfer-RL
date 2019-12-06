@@ -14,8 +14,6 @@ import time
 import datetime
 import collections
 import random
-
-from baselines import bench
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 
 #===================
@@ -34,7 +32,6 @@ env.observation_space = gym.spaces.box.Box(
     [env.observation_space.shape[2], env.observation_space.shape[1], env.observation_space.shape[0]],
     dtype=env.observation_space.dtype)
 
-total_reward = 0
 epsilon = 0.1
 #total_steps = 500000
 total_steps = 100000
@@ -108,7 +105,8 @@ class DQN():
             with torch.no_grad():
                 s = torch.tensor([s], device=device, dtype=torch.float)
                 q_values = self.network(s)
-                return np.argmax(q_values)
+                a = q_values.argmax()
+                return a
 
     # Keep Track of Rewards
     def save_reward(self, r):
@@ -157,57 +155,59 @@ class DQN():
 # Training Loop
 #==================
 
-start = time.time()
-model = DQN()
-state = env.reset()
-state = state.transpose(2, 0, 1)
-for i_steps in range(1, total_steps):
-    action = model.get_action(state, epsilon)
-
-    prev_state = state
-    state, reward, done, _ = env.step(action)
+if __name__ == '__main__':
+    start = time.time()
+    model = DQN()
+    state = env.reset()
     state = state.transpose(2, 0, 1)
-    # TODO: change state_dims or pass in as correct size after state aggregation
-#    if done:
-#        state = None
+    total_reward = 0
+    for i_steps in range(1, total_steps):
+        action = model.get_action(state, epsilon)
 
-    # Save experience
-    model.experience_replay.append((prev_state, action, reward, state))
-
-    # Skip some frames to get some experiences in replay buffer
-    if i_steps >= 100:
-        model.update(prev_state, action, reward, state)
-
-    # Reward for Surviving (Therefore just 1 per time step)
-#    total_reward += 1 # TODO: change reward function
-    total_reward += reward
-
-    if done:
-        state = env.reset()
+        prev_state = state
+        state, reward, done, _ = env.step(action)
         state = state.transpose(2, 0, 1)
-        model.save_reward(total_reward)
-        print(f'total_reward: {total_reward}')
-        total_reward = 0
-        model.save_network()
-        ax = plt.subplot(111)
-        ax.plot(range(len(model.rewards)), model.rewards, label='y = Reward')
-        plt.title('Total Reward per Episode')
-        ax.legend()
-        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-        plt.savefig('plot.png')
-        plt.clf()
-        plt.close()
+        # TODO: change state_dims or pass in as correct size after state aggregation
+#        if done:
+#            state = None
 
-    if i_steps % 1000 == 0:
-        time_delta = int(time.time() - start)
-        time_delta = datetime.timedelta(seconds=time_delta)
-        print(f'i_steps: {i_steps}, time: {time_delta}')
+        # Save experience
+        model.experience_replay.append((prev_state, action, reward, state))
 
-#    if i_steps % 10000 == 0:
-#        model.save_network()
-#        ax = plt.subplot(111)
-#        ax.plot(range(len(model.rewards)), model.rewards, label='y = Reward')
-#        plt.title('Total Reward per Episode')
-#        ax.legend()
-#        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-#        fig.savefig('plot.png')
+        # Skip some frames to get some experiences in replay buffer
+        if i_steps >= 100:
+            model.update(prev_state, action, reward, state)
+
+        # Reward for Surviving (Therefore just 1 per time step)
+#        total_reward += 1 # TODO: change reward function
+        total_reward += reward
+
+        if done:
+            state = env.reset()
+            state = state.transpose(2, 0, 1)
+            model.save_reward(total_reward)
+            print(f'total_reward: {total_reward}')
+            total_reward = 0
+            model.save_network()
+            ax = plt.subplot(111)
+            ax.plot(range(len(model.rewards)), model.rewards, label='y = Reward')
+            plt.title('Total Reward per Episode')
+            ax.legend()
+            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+            plt.savefig('plot.png')
+            plt.clf()
+            plt.close()
+
+        if i_steps % 100 == 0:
+            time_delta = int(time.time() - start)
+            time_delta = datetime.timedelta(seconds=time_delta)
+            print(f'i_steps: {i_steps}, time: {time_delta}')
+
+#        if i_steps % 10000 == 0:
+#            model.save_network()
+#            ax = plt.subplot(111)
+#            ax.plot(range(len(model.rewards)), model.rewards, label='y = Reward')
+#            plt.title('Total Reward per Episode')
+#            ax.legend()
+#            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+#            fig.savefig('plot.png')
