@@ -36,7 +36,8 @@ env.observation_space = gym.spaces.box.Box(
 
 total_reward = 0
 epsilon = 0.1
-total_steps = 500000
+#total_steps = 500000
+total_steps = 100000
 state = env.reset()
 experience_replay_size = 10000
 alpha = 3e-4
@@ -187,18 +188,26 @@ for i_steps in range(1, total_steps):
         model.save_reward(total_reward)
         print(f'total_reward: {total_reward}')
         total_reward = 0
-
-    if i_steps % 100 == 0:
-        time_delta = int(time.time() - start)
-        time_delta = datetime.timedelta(seconds=time_delta)
-        print(f'i_steps: {i_steps}, time: {time_delta}')
-
-    if i_steps % 10000 == 0:
         model.save_network()
         ax = plt.subplot(111)
         ax.plot(range(len(model.rewards)), model.rewards, label='y = Reward')
         plt.title('Total Reward per Episode')
         ax.legend()
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-        fig.savefig('plot.png')
+        plt.savefig('plot.png')
+        plt.clf()
+        plt.close()
 
+    if i_steps % 1000 == 0:
+        time_delta = int(time.time() - start)
+        time_delta = datetime.timedelta(seconds=time_delta)
+        print(f'i_steps: {i_steps}, time: {time_delta}')
+
+#    if i_steps % 10000 == 0:
+#        model.save_network()
+#        ax = plt.subplot(111)
+#        ax.plot(range(len(model.rewards)), model.rewards, label='y = Reward')
+#        plt.title('Total Reward per Episode')
+#        ax.legend()
+#        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+#        fig.savefig('plot.png')
