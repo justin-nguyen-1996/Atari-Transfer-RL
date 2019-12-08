@@ -121,7 +121,6 @@ class DQN():
     # Save Network
     def save_network(self):
         torch.save(self.network.state_dict(), 'logs/{}_saved_network.pt'.format(env_name))
-        torch.save(self.optimizer.state_dict(), 'logs/{}_saved_network_optimizer.pt'.format(env_name))
 
     def get_loss(self):
         # Grab random trajectories from experience replay
