@@ -27,6 +27,7 @@ log_dir = "logs_distill/"
 
 # Reference - https://github.com/openai/baselines/blob/master/baselines/common/atari_wrappers.py
 env_names = ["AssaultNoFrameskip-v4", "DemonAttackNoFrameskip-v4"]
+# Teacher environments
 teacher_envs = []
 for env_name in env_names:
     env = make_atari(env_name)
@@ -37,6 +38,7 @@ for env_name in env_names:
         [env.observation_space.shape[2], env.observation_space.shape[1], env.observation_space.shape[0]],
         dtype=env.observation_space.dtype)
     teacher_envs.append(env)
+# Student environments
 student_envs = []
 for env_name in env_names:
     env = make_atari(env_name)
@@ -52,6 +54,7 @@ for env_name in env_names:
 epsilon = 0.02
 #total_steps = 500000
 total_steps = 100000
+num_game_eps = 100
 state = env.reset()
 experience_replay_size = 10000
 alpha = 3e-4
@@ -105,16 +108,17 @@ class Policy_Distill(nn.Module):
     def __init__(self):
         # Initialize parent's constructor
         super(PolicyDistill, self).__init__()
-        self.experience_replays = [collections.deque(maxlen=experience_replay_size) for env in student_envs]
+        self.student_experience_replays = [collections.deque(maxlen=experience_replay_size) for env in student_envs]
+        self.teacher_experience_replays = [collections.deque(maxlen=experience_replay_size) for env in teacher_envs]
         self.state_dims = student_envs[0].observation_space.shape
         self.num_actions = [env.action_space.n for env in student_envs]
-        self.rewards = [] # TODO
+        self.rewards = [[] for env in student_envs] # List of rewards for each game
         self.target_network_update_count = 0
         # Network and target network
         self.network = DQN_Distill_Network()
         self.target_network = DQN_Distill_Network()
         # Load teacher network weights
-        self.teachers = []
+        self.teacher_networks = []
         for i in range(len(teacher_envs)):
             env = teacher_envs[i]
             env_name = env_names[i]
@@ -122,7 +126,7 @@ class Policy_Distill(nn.Module):
             weights = os.path.join('teacher_weights', env_name+'.pt')
             network.load_state_dict(torch.load(weights))
             network.to(device) # Move stuff to the correct device (cuda gpu or cpu)
-            self.teachers.append(network)
+            self.teacher_networks.append(network)
         # Optimizer
         self.optimizer = torch.optim.Adam(self.network.parameters(), lr=alpha)
         # Move stuff to the correct device (cuda gpu or cpu)
@@ -146,7 +150,7 @@ class Policy_Distill(nn.Module):
         self.rewards.append(r)
 
     # Save Network
-    def save_network(self):
+    def save_network(self, env_name):
         torch.save(self.network.state_dict(), 'logs_distill/{}_saved_network.pt'.format(env_name))
 
     def get_loss_dqn(self, experience_replay):
@@ -175,6 +179,7 @@ class Policy_Distill(nn.Module):
         return kl_divergence_ratio*get_loss_kl_divergence() + get_loss_dqn()
 
     # Update Model Based on state
+    # TODO: fix this
     def update(self, s, a, r, sp):
         # Get loss
         loss = self.get_loss()
@@ -196,59 +201,59 @@ class Policy_Distill(nn.Module):
 
 if __name__ == '__main__':
     start = time.time()
-    model = DQN()
-    state = env.reset()
-    state = state.transpose(2, 0, 1)
+    model = Policy_Distill()
     total_reward = 0
-    for i_steps in range(1, total_steps):
-        action = model.get_epsilon_greedy_action(state, epsilon)
-        prev_state = state
-        state, reward, done, _ = env.step(action)
-        state = state.transpose(2, 0, 1)
-        print(f'action: {action}')
-
-        # TODO: change state_dims or pass in as correct size after state aggregation
-
-#        if done:
-#            state = None
-
-        # Save experience
-        model.experience_replay.append((prev_state, action, reward, state))
-
-        # Skip some frames to get some experiences in replay buffer
-        if i_steps >= 100:
-            model.update(prev_state, action, reward, state)
-
-        # Reward for Surviving (Therefore just 1 per time step)
-#        total_reward += 1 # TODO: change reward function
-        total_reward += reward
-
-        if done:
+    cur_steps = 0
+    while cur_steps < total_steps:
+        # Go through each game and grab the corresponding student and teacher environment
+        # Switch to training on the other game
+        for env_i in student_envs:
+            student_env = student_envs[env_i]
+            teacher_env = teacher_envs[env_i]
             state = env.reset()
             state = state.transpose(2, 0, 1)
-            model.save_reward(total_reward)
-            print(f'total_reward: {total_reward}')
-            total_reward = 0
-            model.save_network()
+            episode_counter = 0
+            # Train on each game, one at a time, for num_game_eps episodes
+            while episode_counter < num_game_eps:
+                # Take a step for the student and save experience
+                student_action = model.get_epsilon_greedy_action(student_state, epsilon)
+                student_prev_state = student_state
+                student_state, student_reward, student_done, _ = env.step(student_action)
+                student_state = student_state.transpose(2, 0, 1)
+                total_reward += student_reward
+                cur_steps += 1
+                model.student_experience_replays[env_i].append(
+                    (student_prev_state, student_action, student_reward, student_state))
+                # Take a step for the teacher and save experience
+                teacher_action = model.get_epsilon_greedy_action(teacher_state, epsilon)
+                teacher_prev_state = teacher_state
+                teacher_state, teacher_reward, teacher_done, _ = env.step(teacher_action)
+                teacher_state = teacher_state.transpose(2, 0, 1)
+                model.teacher_experience_replays[env_i].append(
+                    (teacher_prev_state, teacher_action, teacher_reward, teacher_state))
+                # Skip some frames to get some experiences in replay buffer
+                if cur_steps >= 100:
+                    model.update(prev_state, action, reward, state) # TODO: fix this
+                # Debug print
+                if cur_steps % 100 == 0:
+                    time_delta = int(time.time() - start)
+                    time_delta = datetime.timedelta(seconds=time_delta)
+                    print(f'cur_steps: {cur_steps}, time: {time_delta}')
+                # Reset the environment for the next episode if we're done with the current episode
+                if done:
+                    episode_counter += 1
+                    state = env.reset()
+                    state = state.transpose(2, 0, 1)
+                    model.rewards[env_i].append(total_reward)
+                    print(f'total_reward: {total_reward}')
+                    total_reward = 0
+            # Every time we're done training on one game (i.e. before switch to other game) save plots and network weights
+            model.save_network(env_names[env_i])
             ax = plt.subplot(111)
-            ax.plot(range(len(model.rewards)), model.rewards, label='y = Reward')
+            ax.plot(range(len(model.rewards[env_i])), model.rewards[env_i], label='y = Reward')
             plt.title('Total Reward per Episode')
             ax.legend()
             ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-            plt.savefig('plot.png')
+            plt.savefig('{}.png'.format(env_names[env_i]))
             plt.clf()
             plt.close()
-
-        if i_steps % 100 == 0:
-            time_delta = int(time.time() - start)
-            time_delta = datetime.timedelta(seconds=time_delta)
-            print(f'i_steps: {i_steps}, time: {time_delta}')
-
-#        if i_steps % 10000 == 0:
-#            model.save_network()
-#            ax = plt.subplot(111)
-#            ax.plot(range(len(model.rewards)), model.rewards, label='y = Reward')
-#            plt.title('Total Reward per Episode')
-#            ax.legend()
-#            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-#            fig.savefig('plot.png')

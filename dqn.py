@@ -23,7 +23,8 @@ from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 log_dir = "logs/"
 
 # Reference - https://github.com/openai/baselines/blob/master/baselines/common/atari_wrappers.py
-env_name = "PongNoFrameskip-v4"
+env_name = "AssaultNoFrameskip-v4"
+#env_name = "DemonAttackNoFrameskip-v4"
 env = make_atari(env_name)
 env = wrap_deepmind(env, episode_life=True, clip_rewards=True, frame_stack=False, scale=True)
 env.observation_space = gym.spaces.box.Box(
