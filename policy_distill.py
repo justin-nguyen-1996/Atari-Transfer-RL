@@ -97,3 +97,35 @@ class DQN_Distill_Network(nn.Module):
         feature_size = conv_output.view(1, -1).size(1)
         return feature_size
 
+#===============================
+# Policy Distillation Algorithm
+#===============================
+
+class Policy_Distill(nn.Module):
+    def __init__(self):
+        # Initialize parent's constructor
+        super(PolicyDistill, self).__init__()
+        self.experience_replays = [collections.deque(maxlen=experience_replay_size) for env in student_envs]
+        self.state_dims = student_envs[0].observation_space.shape
+        self.num_actions = [env.action_space.n for env in student_envs]
+        self.rewards = [] # TODO
+        self.target_network_update_count = 0
+        # Network and target network
+        self.network = DQN_Distill_Network()
+        self.target_network = DQN_Distill_Network()
+        # Load teacher network weights
+        self.teachers = []
+        for i in range(len(teacher_envs)):
+            env = teacher_envs[i]
+            env_name = env_names[i]
+            network = DQN_Network(env.observation_space.shape, env.action_space.n)
+            weights = os.path.join('teacher_weights', env_name+'.pt')
+            network.load_state_dict(torch.load(weights))
+            network.to(device) # Move stuff to the correct device (cuda gpu or cpu)
+            self.teachers.append(network)
+        # Optimizer
+        self.optimizer = torch.optim.Adam(self.network.parameters(), lr=alpha)
+        # Move stuff to the correct device (cuda gpu or cpu)
+        self.network = self.network.to(device)
+        self.target_network = self.target_network.to(device)
+
