@@ -153,7 +153,7 @@ class Policy_Distill(nn.Module):
 
     # Save Network
     def save_network(self, env_name):
-        torch.save(self.network.state_dict(), 'logs_distill/{}_saved_network.pt'.format(env_name))
+        torch.save(self.network.state_dict(), 'log_distill/{}_saved_network.pt'.format(env_name))
 
     def get_loss_dqn(self, env_i):
         # Grab random trajectories from experience replay
@@ -255,7 +255,7 @@ if __name__ == '__main__':
                 model.teacher_experience_replays[env_i].append(
                     (teacher_prev_state, teacher_action, teacher_reward, teacher_state))
                 # Skip some frames to get some experiences in replay buffer
-                if cur_steps >= 100:
+                if len(model.student_experience_replays[env_i]) >= 100:
                     model.update(env_i)
                 # Debug print
                 if cur_steps % 100 == 0:
@@ -268,7 +268,8 @@ if __name__ == '__main__':
                     student_state = student_env.reset()
                     student_state = student_state.transpose(2, 0, 1)
                     model.rewards[env_i].append(student_total_reward) # Save student reward for the episode
-                    print(f'student_total_reward: {student_total_reward}')
+                    print(f'student_total_reward: {student_total_reward}, \
+                            student_episode_counter: {student_episode_counter}')
                     student_total_reward = 0
                 # Reset the environment for the teacher
                 if teacher_done:
