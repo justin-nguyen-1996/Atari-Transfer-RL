@@ -37,7 +37,6 @@ env.observation_space = gym.spaces.box.Box(
 epsilon = 0.02
 #total_steps = 500000
 total_steps = 100000
-state = env.reset()
 experience_replay_size = 10000
 alpha = 3e-4
 #gamma = 0.99
@@ -143,7 +142,7 @@ class DQN():
         return loss
 
     # Update Model Based on state
-    def update(self, s, a, r, sp):
+    def update(self):
         # Get loss
         loss = self.get_loss()
 #        print(f'loss: {loss}')
@@ -185,7 +184,7 @@ if __name__ == '__main__':
 
         # Skip some frames to get some experiences in replay buffer
         if i_steps >= 100:
-            model.update(prev_state, action, reward, state)
+            model.update()
 
         # Reward for Surviving (Therefore just 1 per time step)
 #        total_reward += 1 # TODO: change reward function
