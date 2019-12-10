@@ -14,5 +14,5 @@ To run code as is just use
 python3 dqn.py
 ```
 
-In order to change environments just change the value of ``env_id`` in the top of the code
+In order to change environments just change the value of ``env_name`` in the top of the code
 
