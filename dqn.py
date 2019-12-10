@@ -48,7 +48,7 @@ gamma = 0.9
 batch_size = 16
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 target_network_update_freq = 500
-scale = 4 # Bigger is Smaller
+scale = 2 # Bigger is Smaller
 
 dmap = [2,5]
 #=====================
@@ -71,8 +71,8 @@ class DQN_Network(nn.Module):
         self.conv2 = nn.Conv2d(16, 32, kernel_size=2, stride=2)
         self.conv3 = nn.Conv2d(32, 32, kernel_size=1, stride=1)
         # Fully connected layers
-        self.fc1 = nn.Linear(self.feature_size(), 128)
-        self.fc2 = nn.Linear(128, self.num_actions)
+        self.fc1 = nn.Linear(self.feature_size(), 256)
+        self.fc2 = nn.Linear(256, self.num_actions)
 
     def forward(self, x):
         x = torch.nn.functional.relu(self.conv1(x))
