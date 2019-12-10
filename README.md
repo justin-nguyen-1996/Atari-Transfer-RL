@@ -7,7 +7,6 @@ This code was built to run on python 3.6+
 Run the following to have all the required libraries 
 ```
 pip3 install --user numpy torch gym gym[atari] matplotlib ipython baselines
-
 ```
 
 To run code as is just use
