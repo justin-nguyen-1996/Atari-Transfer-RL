@@ -9,10 +9,16 @@ Run the following to have all the required libraries
 pip3 install --user numpy torch gym gym[atari] matplotlib ipython baselines
 ```
 
-To run code as is just use
+To run code to train a teacher as is just use
 ```
 python3 dqn.py
 ```
 
+To run code to train a student using policy distill use
+```
+python3 policy_distill.py
+```
+
 In order to change environments just change the value of ``env_name`` in the top of the code
+For state abstraction check state abstraction branch to train abstraction teachers
 
