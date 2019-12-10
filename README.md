@@ -15,7 +15,7 @@ To run code as is just use
 python3 dqn.py
 ```
 
-In order to change environments just change the value of ``env_name`` in the top of the code
+In order to change environments just change the value of ``env_id`` in the top of the code
 Additionally change the vale of ``scale`` from 2 to 1 for no state abstraction or to 4 or 6 for higher abstraction
 
 Additionally you might need to change the dimensions of the Neural Network layers to accomidate any change of abstraction
