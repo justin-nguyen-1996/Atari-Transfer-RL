@@ -19,6 +19,7 @@ To run code to train a student using policy distill use
 python3 policy_distill.py
 ```
 
-In order to change environments just change the value of ``env_name`` in the top of the code
+In order to change environments just change the value of ``env_name`` in the top of the code.
+
 For state abstraction check state abstraction branch to train abstraction teachers
 
