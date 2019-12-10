@@ -52,19 +52,16 @@ for env_name in env_names:
         dtype=env.observation_space.dtype)
     student_envs.append(env)
 
-#epsilon = 0.1
-epsilon = 0.02
-#total_steps = 500000
+epsilon = 0.1
 total_steps = 100000
 num_game_eps = 100
 experience_replay_size = 10000
-alpha = 3e-4
-#gamma = 0.99
-gamma = 0.9
-batch_size = 16
+alpha = 0.00025
+gamma = 0.99
+batch_size = 32
+kl_divergence_ratio = 0.1
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 target_network_update_freq = 500
-kl_divergence_ratio = 0.1
 
 #=====================
 # Network Declaration
